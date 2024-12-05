@@ -43,14 +43,18 @@ function Content() {
   const navigate = useNavigate();
 
   const searchParams = new URLSearchParams(location.search);
-  const id = searchParams.get("id");
+  const id = searchParams.get("vehicleId");
   const start = searchParams.get("start") ?? "";
   const end = searchParams.get("end") ?? "";
+
+  console.log("id", id);
 
   const startDate = new Date(start);
   const endDate = new Date(end);
 
   const [vehicle] = trpc.vehicles.get.useSuspenseQuery({ id: id! });
+
+  console.log("vehicle", vehicle);
 
   const [quote] = trpc.reservations.quote.useSuspenseQuery({
     vehicleId: id!,

@@ -1,17 +1,32 @@
 import { ErrorFallback } from "@/components/ErrorFallback";
-import { Button } from "@/components/ui/button.tsx";
-import { Form } from "@/components/ui/form.tsx";
+import { Button } from "@/components/ui/button";
+import { Form } from "@/components/ui/form";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import { roundToNearest30Minutes } from "@/lib/times.ts";
+import { roundToNearest30Minutes } from "@/lib/times";
 import { addDays, addHours, format } from "date-fns";
 import { Suspense, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { useForm } from "react-hook-form";
-import { FormValues } from "@/components/search/form.tsx";
-import { AdditionalFilters } from "@/components/search/AdditionalFilters.tsx";
-import { VehicleList } from "@/components/search/VehicleList.tsx";
-import { TimeRangeFilters } from "@/components/search/TimeRangeFilters.tsx";
+import { FormValues } from "@/components/search/form";
+import { AdditionalFilters } from "@/components/search/AdditionalFilters";
+import { VehicleList } from "@/components/search/VehicleList";
+import { TimeRangeFilters } from "@/components/search/TimeRangeFilters";
+import { trpc } from "@/trpc";
+interface FilterData {
+  minPrice: number;
+  maxPrice: number;
+  minPassengers: number;
+  vehicleClass: string;
+  vehicleMake: string;
+}
+
+interface Filters {
+  priceMin: number;
+  priceMax: number;
+  passengerCount: number;
+  make: string[];
+  classification: string[];
+}
 
 export function SearchPage() {
   const [initialStartDateAndTime] = useState(() =>
@@ -21,6 +36,14 @@ export function SearchPage() {
   const [initialEndDateAndTime] = useState(() =>
     addDays(initialStartDateAndTime, 1),
   );
+
+  const [filters, setFilters] = useState<Filters>({
+    priceMin: 0,
+    priceMax: 100000,
+    passengerCount: 0,
+    make: [],
+    classification: [],
+  });
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -36,23 +59,25 @@ export function SearchPage() {
     },
   });
 
-  const filters = (
-    <ErrorBoundary
-      fallback={<ErrorFallback message="Failed to load filters" />}
-    >
-      <Suspense
-        fallback={
-          <div className="flex flex-col gap-4">
-            <Skeleton className="w-full h-[100px] rounded" />
-            <Skeleton className="w-full h-[100px] rounded" />
-            <Skeleton className="w-full h-[100px] rounded" />
-          </div>
-        }
-      >
-        <AdditionalFilters />
-      </Suspense>
-    </ErrorBoundary>
-  );
+  const handleApplyFilters = (data: FilterData) => {
+    setFilters({
+      priceMin: data.minPrice || 0,
+      priceMax: data.maxPrice || 100000,
+      passengerCount: data.minPassengers || 0,
+      make: data.vehicleMake ? [data.vehicleMake] : [],
+      classification: data.vehicleClass ? [data.vehicleClass] : [],
+    });
+  };
+
+  const { data: vehicles } = trpc.vehicles.search.useQuery({
+    startTime: format(initialStartDateAndTime, "yyyy-MM-dd'T'HH:mm:ss'Z'"),
+    endTime: format(initialEndDateAndTime, "yyyy-MM-dd'T'HH:mm:ss'Z'"),
+    priceMin: filters.priceMin,
+    priceMax: filters.priceMax,
+    passengerCount: filters.passengerCount,
+    make: filters.make,
+    classification: filters.classification,
+  });
 
   return (
     <Form {...form}>
@@ -75,27 +100,46 @@ export function SearchPage() {
                 <SheetTrigger asChild>
                   <Button variant="outline">Filters</Button>
                 </SheetTrigger>
-                <SheetContent>{filters}</SheetContent>
+                <SheetContent>
+                  <ErrorBoundary
+                    fallback={
+                      <ErrorFallback message="Failed to load filters" />
+                    }
+                  >
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <AdditionalFilters onApplyFilters={handleApplyFilters} />
+                    </Suspense>
+                  </ErrorBoundary>
+                </SheetContent>
               </Sheet>
             </div>
-            <div className="hidden md:block">{filters}</div>
+            <div className="hidden md:block">
+              <ErrorBoundary
+                fallback={<ErrorFallback message="Failed to load filters" />}
+              >
+                <Suspense fallback={<div>Loading...</div>}>
+                  <AdditionalFilters onApplyFilters={handleApplyFilters} />
+                </Suspense>
+              </ErrorBoundary>
+            </div>
           </div>
 
           <div className="col-span-12 md:col-span-9 px-4 py-8">
             <ErrorBoundary
               fallback={<ErrorFallback message="Failed to load vehicles" />}
             >
-              <Suspense
-                fallback={
-                  <div className="flex flex-col gap-4">
-                    <Skeleton className="w-full h-[178px] rounded" />
-                    <Skeleton className="w-full h-[178px] rounded" />
-                    <Skeleton className="w-full h-[178px] rounded" />
-                    <Skeleton className="w-full h-[178px] rounded" />
-                  </div>
-                }
-              >
-                <VehicleList />
+              <Suspense fallback={<div>Loading...</div>}>
+                {vehicles ? (
+                  <VehicleList
+                    vehicles={vehicles.vehicles}
+                    startDate={form.watch("startDate")}
+                    startTime={form.watch("startTime")}
+                    endDate={form.watch("endDate")}
+                    endTime={form.watch("endTime")}
+                  />
+                ) : (
+                  <div>No vehicles found</div>
+                )}
               </Suspense>
             </ErrorBoundary>
           </div>

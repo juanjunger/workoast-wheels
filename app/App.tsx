@@ -6,6 +6,7 @@ import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { ReviewPage } from "./pages/ReviewPage";
 import { trpc } from "./trpc";
 import { ConfirmationPage } from "@/pages/ConfirmationPage.tsx";
+import { VehicleDetailPage } from "@/pages/VehicleDetailPage.tsx";
 
 function App() {
   const [queryClient] = useState(() => new QueryClient());
@@ -31,6 +32,7 @@ function App() {
               path="/confirmation/:reservationId"
               element={<ConfirmationPage />}
             />
+            <Route path="/vehicle/:vehicleId" element={<VehicleDetailPage />} />
           </Routes>
         </Router>
       </QueryClientProvider>
